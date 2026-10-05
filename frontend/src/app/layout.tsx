@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
-export const metadata: Metadata = { title: "TaskTrack", description: "Public task and team management app" };
+export const metadata: Metadata = { title: "TaskTrack Ass2", description: "Authenticated task and team management workspace" };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body>{children}</body></html>; }
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body><Providers>{children}</Providers></body></html>; }
