@@ -20,6 +20,10 @@ public partial class TaskManagementContext : DbContext
 
     public virtual DbSet<Task> Tasks { get; set; }
 
+    public virtual DbSet<SystemAccount> SystemAccounts { get; set; }
+
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -86,6 +90,40 @@ public partial class TaskManagementContext : DbContext
             entity.Property(e => e.TagName).HasMaxLength(50);
         });
 
+        modelBuilder.Entity<SystemAccount>(entity =>
+        {
+            entity.HasKey(e => e.AccountId).HasName("SystemAccount_pkey");
+            entity.ToTable("SystemAccount");
+            entity.HasIndex(e => e.Email, "UX_SystemAccount_EmailLower").IsUnique();
+            entity.Property(e => e.AccountId).HasColumnName("AccountID");
+            entity.Property(e => e.FullName).HasMaxLength(150);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.PasswordHash).HasMaxLength(512);
+            entity.Property(e => e.Role).HasDefaultValue((short)0);
+            entity.Property(e => e.CreatedDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.RefreshTokenId).HasName("RefreshToken_pkey");
+            entity.ToTable("RefreshToken");
+            entity.HasIndex(e => e.TokenHash, "UX_RefreshToken_TokenHash").IsUnique();
+            entity.HasIndex(e => e.AccountId, "IX_RefreshToken_AccountID");
+            entity.Property(e => e.RefreshTokenId).HasColumnName("RefreshTokenID");
+            entity.Property(e => e.AccountId).HasColumnName("AccountID");
+            entity.Property(e => e.TokenHash).HasMaxLength(64);
+            entity.Property(e => e.ReplacedByTokenHash).HasMaxLength(64);
+            entity.Property(e => e.CreatedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.ExpiresDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.RevokedDate).HasColumnType("timestamp without time zone");
+            entity.HasOne(e => e.Account).WithMany(a => a.RefreshTokens)
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RefreshToken_SystemAccount");
+        });
+
         modelBuilder.Entity<Task>(entity =>
         {
             entity.HasKey(e => e.TaskId).HasName("Task_pkey");
@@ -98,6 +136,8 @@ public partial class TaskManagementContext : DbContext
                 .HasColumnType("timestamp without time zone");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.ModifiedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.CreatedById).HasColumnName("CreatedByID");
+            entity.Property(e => e.UpdatedById).HasColumnName("UpdatedByID");
             entity.Property(e => e.Priority).HasDefaultValue((short)1);
             entity.Property(e => e.ProjectId).HasColumnName("ProjectID");
             entity.Property(e => e.Status).HasDefaultValue((short)0);
@@ -107,6 +147,16 @@ public partial class TaskManagementContext : DbContext
                 .HasForeignKey(d => d.ProjectId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Task_Project");
+
+            entity.HasOne(d => d.CreatedBy).WithMany(a => a.CreatedTasks)
+                .HasForeignKey(d => d.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Task_CreatedBy");
+
+            entity.HasOne(d => d.UpdatedBy).WithMany(a => a.UpdatedTasks)
+                .HasForeignKey(d => d.UpdatedById)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Task_UpdatedBy");
 
             entity.HasMany(d => d.Tags).WithMany(p => p.Tasks)
                 .UsingEntity<Dictionary<string, object>>(
