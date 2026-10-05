@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using RefreshToken = TaskTrack.Repo.Models.RefreshToken;
 using SystemAccount = TaskTrack.Repo.Models.SystemAccount;
@@ -7,6 +8,7 @@ namespace TaskTrack.Repo.Repositories;
 
 public interface IAccountRepository
 {
+    Task<List<SystemAccount>> GetAllAsync();
     Task<SystemAccount?> GetByEmailAsync(string normalizedEmail);
     Task<SystemAccount?> GetByIdAsync(int id);
     Task<bool> EmailExistsAsync(string normalizedEmail, int? exceptAccountId = null);

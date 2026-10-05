@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TaskTrack.API.Extensions;
 using TaskTrack.Service.Dtos;
 using TaskTrack.Service.Interfaces;
 
@@ -12,7 +13,7 @@ public class TasksController(ITaskService service) : ControllerBase
     [HttpGet("search")] public async Task<ActionResult> Search([FromQuery] string? title, [FromQuery] short? status, [FromQuery] short? priority, [FromQuery] int? projectId, [FromQuery] int? tagId) => Ok(await service.GetAllAsync(title, status, priority, projectId, tagId));
     [HttpGet("project/{projectId:int}")] public async Task<ActionResult> GetByProject(int projectId) => Ok(await service.GetByProjectAsync(projectId));
     [HttpGet("{id:int}")] public async Task<ActionResult> GetById(int id) => Ok(await service.GetByIdAsync(id));
-    [Authorize, HttpPost] public async Task<ActionResult> Create(TaskRequest request) { var created = await service.CreateAsync(request); return CreatedAtAction(nameof(GetById), new { id = created.TaskId }, created); }
-    [Authorize, HttpPut("{id:int}")] public async Task<ActionResult> Update(int id, TaskRequest request) => Ok(await service.UpdateAsync(id, request));
-    [Authorize, HttpDelete("{id:int}")] public async Task<ActionResult> Delete(int id) { await service.DeleteAsync(id); return NoContent(); }
+    [Authorize, HttpPost] public async Task<ActionResult> Create(TaskRequest request) { var created = await service.CreateAsync(request, User.GetAccountId()); return CreatedAtAction(nameof(GetById), new { id = created.TaskId }, created); }
+    [Authorize, HttpPut("{id:int}")] public async Task<ActionResult> Update(int id, TaskRequest request) => Ok(await service.UpdateAsync(id, request, User.GetAccountId()));
+    [Authorize, HttpDelete("{id:int}")] public async Task<ActionResult> Delete(int id) { await service.DeleteAsync(id, User.GetAccountId()); return NoContent(); }
 }

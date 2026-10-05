@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,9 @@ namespace TaskTrack.Repo.Repositories;
 
 public class AccountRepository(TaskManagementContext db) : IAccountRepository
 {
+    public Task<List<SystemAccount>> GetAllAsync() =>
+        db.SystemAccounts.AsNoTracking().OrderBy(x => x.FullName).ToListAsync();
+
     public Task<SystemAccount?> GetByEmailAsync(string normalizedEmail) =>
         db.SystemAccounts.FirstOrDefaultAsync(x => x.Email.ToLower() == normalizedEmail);
 
