@@ -1,0 +1,28 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Shell } from "@/components/AdminPageShell";
+import { useAuth } from "@/components/AuthProvider";
+import { ManagementNav } from "@/components/ManagementNav";
+import { getDepartments, getProjects, getTags, searchTasks } from "@/lib/api";
+
+const cards = [
+  { key: "departments", label: "Departments", href: "/admin/departments", icon: "▦", color: "from-indigo-500 to-blue-600", hint: "Team structure" },
+  { key: "projects", label: "Projects", href: "/admin/projects", icon: "◇", color: "from-violet-500 to-fuchsia-600", hint: "Active initiatives" },
+  { key: "tasks", label: "Tasks", href: "/admin/tasks", icon: "✓", color: "from-cyan-500 to-blue-600", hint: "Work items" },
+  { key: "tags", label: "Tags", href: "/admin/tags", icon: "#", color: "from-amber-400 to-orange-600", hint: "Shared labels" },
+] as const;
+
+export default function AdminDashboard() {
+  const { account } = useAuth();
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => { Promise.all([getDepartments(), getProjects(), searchTasks(""), getTags()]).then(([departments, projects, tasks, tags]) => setCounts({ departments: departments.length, projects: projects.length, tasks: tasks.length, tags: tags.length })).catch((reason) => setError(reason.message)).finally(() => setLoading(false)); }, []);
+  return <Shell><ManagementNav /><section className="relative overflow-hidden rounded-[2rem] bg-slate-950 px-7 py-9 text-white shadow-2xl shadow-indigo-100 sm:px-10"><div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_22%,rgba(99,102,241,.5),transparent_28%),radial-gradient(circle_at_20%_90%,rgba(168,85,247,.3),transparent_30%)]" /><div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div><div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-indigo-200"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,.12)]" />Secure workspace</div><h1 className="mt-5 max-w-2xl text-4xl font-black tracking-[-.045em] sm:text-5xl">Good to see you, {account?.fullName.split(" ").at(-1)}.</h1><p className="mt-4 max-w-xl leading-7 text-slate-300">Everything your team needs to organize work, protect changes, and keep delivery moving.</p></div><Link href="/admin/tasks" className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-xl transition hover:-translate-y-0.5 hover:text-indigo-700">Manage tasks <span className="ml-2">→</span></Link></div></section>
+    {error && <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5 font-semibold text-red-700">{error}</div>}
+    <section className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card, index) => <Link key={card.key} href={card.href} className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-100/70"><div className={`absolute -right-8 -top-8 h-28 w-28 rounded-full bg-gradient-to-br ${card.color} opacity-10 blur-xl transition group-hover:scale-125 group-hover:opacity-20`} /><div className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${card.color} text-xl font-black text-white shadow-lg`} style={{ animationDelay: `${index * 80}ms` }}>{card.icon}</div><div className="mt-7 flex items-end justify-between"><div><p className="text-sm font-bold text-slate-500">{card.label}</p><p className="mt-1 text-4xl font-black tracking-tight text-slate-950">{loading ? <span className="inline-block h-10 w-14 animate-pulse rounded-lg bg-slate-100" /> : counts[card.key] ?? 0}</p></div><span className="mb-1 text-xl text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-500">→</span></div><p className="mt-4 text-xs font-semibold uppercase tracking-[.15em] text-slate-400">{card.hint}</p></Link>)}</section>
+    <section className="mt-7 grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm"><p className="text-xs font-black uppercase tracking-[.18em] text-indigo-600">Quick actions</p><h2 className="mt-2 text-2xl font-black tracking-tight">Move work forward</h2><div className="mt-6 grid gap-3 sm:grid-cols-2">{cards.map((card) => <Link key={card.key} href={card.href} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"><span className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100">{card.icon}</span>{card.label}</span><span>→</span></Link>)}</div></div><div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-7 text-white shadow-xl shadow-indigo-100"><p className="text-xs font-black uppercase tracking-[.18em] text-indigo-200">Access level</p><h2 className="mt-3 text-2xl font-black">{account?.role === 1 ? "Administrator" : "Staff member"}</h2><p className="mt-3 text-sm leading-6 text-indigo-100">{account?.role === 1 ? "You can manage accounts, roles, and every workspace resource." : "You can create and manage departments, projects, tasks, and tags."}</p><Link href="/profile" className="mt-7 inline-flex rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-black text-white hover:bg-white/20 hover:text-white">View profile</Link></div></section>
+  </Shell>;
+}
