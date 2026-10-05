@@ -1,5 +1,11 @@
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Npgsql;
+using TaskTrack.API.Services;
 using TaskTrack.Repo;
 using TaskTrack.Repo.Repositories;
 using TaskTrack.Service.Interfaces;
@@ -16,10 +22,14 @@ if (string.IsNullOrWhiteSpace(rawConnection)) throw new InvalidOperationExceptio
 
 builder.Services.AddDbContext<TaskManagementContext>(options => options.UseNpgsql(ToNpgsqlConnectionString(rawConnection)));
 builder.Services.AddScoped<ITaskTrackRepository, TaskTrackRepository>();
+builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITagService, TagService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList() ?? [];
 var deployedFrontend = builder.Configuration["FRONTEND_URL"];
 if (!string.IsNullOrWhiteSpace(deployedFrontend)) configuredOrigins.Add(deployedFrontend.TrimEnd('/'));
@@ -31,10 +41,50 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 
 // Add services to the container.
 
+var jwtSecret = builder.Configuration["JWT_SECRET"] ?? builder.Configuration["Jwt:Secret"];
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+    throw new InvalidOperationException("JWT_SECRET (or Jwt:Secret locally) must contain at least 32 characters.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TaskTrack.API";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TaskTrack.Frontend";
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
+        };
+    });
+builder.Services.AddAuthorization();
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter the JWT access token returned by /api/auth/login."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecurityScheme
+        {
+            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+        }] = Array.Empty<string>()
+    });
+});
 
 var app = builder.Build();
 
@@ -42,6 +92,8 @@ app.UseMiddleware<TaskTrack.API.Middleware.ApiExceptionMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors("Frontend");
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapGet("/health", async (TaskManagementContext database, CancellationToken cancellationToken) =>
