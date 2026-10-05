@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: qe190133-prn232-ass2-be
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: FRONTEND_URL
+        value: https://qe190133-prn232-ass2-fe.vercel.app
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

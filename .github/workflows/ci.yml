@@ -1,0 +1,67 @@
+name: Assignment 2 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ass2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: 8.0.x
+  NODE_VERSION: 22
+
+jobs:
+  backend:
+    name: Backend build and Docker validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore backend/QE190133_PRN232_Ass2_BE.sln
+      - name: Build
+        run: dotnet build backend/QE190133_PRN232_Ass2_BE.sln --configuration Release --no-restore
+      - name: Publish
+        run: dotnet publish backend/TaskTrack.API/TaskTrack.API.csproj --configuration Release --no-restore --output artifacts/backend
+      - name: Validate production container
+        run: docker build --tag tasktrack-ass2-api:${{ github.sha }} backend
+
+  frontend:
+    name: Frontend lint and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  production-smoke-test:
+    name: Production smoke test
+    if: github.event_name == 'workflow_dispatch'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify GitHub, Vercel, Render, health, and Swagger
+        run: bash .github/scripts/smoke-test.sh
